@@ -1,0 +1,65 @@
+import numpy as np
+from Crypto.PublicKey import RSA
+import json
+from urllib.request import urlopen, Request
+from bs4 import BeautifulSoup
+import os 
+import requests
+import pandas as pd
+from pprint import pprint
+import matplotlib.pyplot as plt
+import seaborn as sns
+%matplotlib inline
+
+from nltk.sentiment.vader import SentimentIntensityAnalyzer as SIA
+
+sid = SIA()
+
+url_ny_dnews = 'https://www.nydailynews.com/arcio/rss/category/news/?sort=display_date:desc'
+url_cbs_bost = 'https://boston.cbslocal.com/feed/'
+url_times = 'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml'
+
+news_arr = []
+
+for url in [url_ny_dnews, url_cbs_bost, url_times]:
+    result = requests.get(url)
+    soup = BeautifulSoup(result.content, features='xml')
+    items = soup.findAll('item')
+    if url == url_times:
+        news_outlet = 'newyork_times'
+    elif url == 'url_ny_dnews':
+        news_outlet = 'ny_dailynews'
+    elif url == 'url_cbs_bost':
+        news_outlet = 'cbs_boston'
+        
+    news_items = []
+    for item in items:
+        news_item= {}
+        news_item['News_Outlet'] = news_outlet
+        news_item['title'] = item.title.text
+        news_item['description'] = item.description.text
+        news_item['link'] = item.link.text
+        news_item['pubDate'] = item.pubDate.text
+        news_items.append(news_item)
+    news_arr.append(news_items)
+
+for item in news_arr:
+    print(len(item))
+
+df_newyork_times = pd.DataFrame(news_arr[0], columns=['News_Outlet', 'title', 'description', 'link', 'pubDate'])
+df_ny_dailynews = pd.DataFrame(news_arr[1], columns=['News_Outlet', 'title', 'description', 'link', 'pubDate'])
+df_cbs_boston = pd.DataFrame(news_arr[2], columns=['News_Outlet', 'title', 'description', 'link', 'pubDate'])
+df_scrapped = pd.concat([df_newyork_times, df_ny_dailynews, df_cbs_boston], ignore_index=True)
+df_scrapped.head()
+
+import nltk
+nltk.download()
+
+
+import datetime
+
+scores = df_scrapped ['title'].apply(sid.polarity_scores).tolist()
+scores_df = pd.DataFrame(scores)
+df_scrapped = df_scrapped.join(scores_df, rsuffix='_right')
+df_scrapped.head(10)
+
